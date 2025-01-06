@@ -1,0 +1,46 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        base-image: ['ubuntu:latest', 'debian:latest']
+        include:
+          - base-image: 'ubuntu:latest'
+            tag-suffix: 'ubuntu'
+          - base-image: 'debian:latest'
+            tag-suffix: 'debian'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            BASE_IMAGE=${{ matrix.base-image }}
+          tags: |
+            ghcr.io/${{ github.repository }}/cert-handler:${{ matrix.tag-suffix }}
+            ghcr.io/${{ github.repository }}/cert-handler:${{ matrix.tag-suffix }}-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
